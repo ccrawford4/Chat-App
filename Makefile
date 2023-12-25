@@ -1,4 +1,4 @@
-OBJS = main.o
+OBJS = main.o socket.o http.o
 PROG = app
 DEBUG_FLAG = -g
 
