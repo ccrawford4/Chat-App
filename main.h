@@ -8,7 +8,6 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <sys/select.h>
 
 #define RECV_BUFFER 10000
 #define CLIENT_STR_LEN 4
@@ -24,4 +23,4 @@ int init_socket(struct addrinfo *results);
 struct addrinfo init_hints();
 void configure_socket(int fd);
 struct pollfd *init_poll(int fd);
-void accept_request(int fd);
+void accept_request(int fd, struct pollfd *fds);

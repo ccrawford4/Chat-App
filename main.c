@@ -44,14 +44,16 @@ int main(int argc, char *argv[]) {
 
   int fd = init_socket(results);
   freeaddrinfo(results);
-  
+
   if (fd == -1) {
     perror("socket/bind");
     exit(-1);
   }
 
   configure_socket(fd);
-  accept_request(fd);
-  close(fd);
+  struct pollfd *fds = init_poll(fd);
+  accept_request(fd, fds);
+  free(fds);
+
   return 0;
 }

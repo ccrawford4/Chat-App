@@ -12,8 +12,6 @@ struct pollfd *init_poll(int fd) {
   memset(fds, 0, POLLFD_SIZE * sizeof(struct pollfd));
   fds[0].fd = fd;
   fds[0].events = POLLIN;
-  fds[1].fd = STDIN_FILENO;
-  fds[1].events = POLLIN;
   return fds;
 }
 
@@ -46,7 +44,6 @@ void handle_send_error(int fd, struct pollfd *fds, int i, bool *end_server) {
   *end_server = true;
 }
 
-
 // Handles client requests
 void handle_client_request(int fd, struct pollfd *fds, int i,
                            bool *end_server) {
@@ -54,7 +51,7 @@ void handle_client_request(int fd, struct pollfd *fds, int i,
   memset(buffer, 0, sizeof(buffer));
   ssize_t bytes_received;
   
-  bytes_received = read(STDIN_FILENO, buffer, RECV_BUFFER - 1);
+  bytes_received = recv(fds[i].fd, buffer, sizeof(buffer) - 1, 0);
   if (bytes_received < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       return;
@@ -66,74 +63,55 @@ void handle_client_request(int fd, struct pollfd *fds, int i,
     return;
   }
   
-  printf("%s\n", buffer);
+  char* response = "test test test helloooo\n";
+  ssize_t bytes_sent;
 
- /* ssize_t bytes_sent;
-  bytes_sent = send(fds[i].fd, file_result, strlen(file_result) + file_size, 0);
+  bytes_sent = send(fds[i].fd, response, strlen(response), 0);
 
   if (bytes_sent < 0) {
     handle_send_error(fd, fds, i, end_server);
     return;
-  }*/
+  }
 }
 
 // Accepts requests using the listener fd and the array of pollfds
-void accept_request(int fd) {
-    printf("test 1\n");
-    int timeout = TIMEOUT;
-    int nfds = 2;
-    bool end_server = false;
-    char buffer[RECV_BUFFER];
-    ssize_t bytes_received;
+void accept_request(int fd, struct pollfd *fds) {
+  int timeout = TIMEOUT;
+  int nfds = 1;
+  bool end_server = false;
 
-    struct pollfd* fds = init_poll(fd);
-    struct sockaddr_storage client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
-    printf("test 2\n");
+  do {
+    int curr_size = nfds;
+    int poll_result = poll(fds, nfds, timeout);
 
-    do {
-        int curr_size = nfds;
-        printf("test 2.5\n");
-        int poll_result = poll(fds, nfds, -1);
-        printf("test 2.7\n"); 
-        if (poll_result == -1) {
-            perror("poll() failed");
-            break;
-        }
-        
-        printf("test 3\n");
-        if (poll_result == 0) {
-            continue;
-        }
+    if (poll_result == -1) {
+      perror("poll() failed");
+      break;
+    }
 
-        for (int i = 0; i < curr_size; i++) {
-            printf("test 4\n");
-            if (fds[i].revents == 0) {
-                continue;
-             }
-             printf("i: %d\n", i);
-             if (fds[i].fd == fd && fds[i].revents & POLLIN) {
-                bytes_received = recvfrom(fd, buffer, RECV_BUFFER - 1, 0,
-                                        (struct sockaddr*)&client_addr, &client_addr_len);
-                if (bytes_received == -1) {
-                    perror("recvfrom()");
-                    continue;
-                 }
+    if (poll_result == 0) {
+      continue;
+    }
 
-                 buffer[bytes_received] = '\0';
-                 printf("Recv: %s\n", buffer);
+    for (int i = 0; i < curr_size; i++) {
+      if (fds[i].revents == 0) {
+        continue;
+      }
 
-             } else if (fds[i].revents & POLLIN) {
-                bytes_received = read(STDIN_FILENO, buffer, RECV_BUFFER - 1);
-                if (bytes_received <= 0) {
-                    perror("read");
-                    continue;
-                }
-                buffer[bytes_received] = '\0';
-                printf("Stdin: %s\n", buffer);
+      if (fds[i].fd == fd && fds[i].revents != POLLIN) {
+        printf("Error! revents = %d\n", fds[i].revents);
+        close(fds[i].fd);
+        close(fd);
+        free(fds);
+        exit(-1);
+      }
 
-             }
+      if (fds[i].fd == fd) {
+        accept_connections(fd, fds, &nfds, &end_server);
 
-        }
-    } while (!end_server);
+      } else {
+        handle_client_request(fd, fds, i, &end_server);
+      }
+    }
+  } while (!end_server);
 }

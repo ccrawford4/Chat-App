@@ -23,9 +23,9 @@ struct addrinfo init_hints() {
   struct addrinfo hints;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE;
-  hints.ai_protocol = IPPROTO_UDP;
+  hints.ai_protocol = IPPROTO_TCP;
   return hints;
 }
 
@@ -50,8 +50,18 @@ void set_nonblocking(int fd) {
   }
 }
 
+// Sets up socket for listening
+void set_listen(int fd) {
+  if (listen(fd, SOMAXCONN) == -1) {
+    perror("listen");
+    close(fd);
+    exit(-1);
+  }
+}
+
 // Configures the socket
 void configure_socket(int fd) {
   set_sockopt(fd);
   set_nonblocking(fd);
+  set_listen(fd);
 }
